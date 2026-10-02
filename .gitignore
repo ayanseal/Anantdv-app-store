@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.next-e2e/
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-*
+src/generated/
+test-results/
+playwright-report/
+coverage/
+*.tsbuildinfo
+.superpowers/
+artifacts/

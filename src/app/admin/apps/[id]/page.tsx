@@ -1,0 +1,14 @@
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { requirePagePrincipal } from '@/server/page-auth';
+import { getAdminApp } from '@/server/services/apps';
+import { getConfig } from '@/config/env';
+import { AppForm, ReleaseForm, ReleasePublish } from '@/components/admin-forms';
+import { DownloadButton } from '@/components/download-button';
+import { formatDate, formatSize } from '@/lib/format';
+export default async function AdminApp({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const app = await getAdminApp(await requirePagePrincipal(`/admin/apps/${id}`), id);
+  const config = getConfig();
+  return <><Link className="back-link" href="/admin/apps"><ArrowLeft size={13} />All apps</Link><div className="page-heading"><div><div className="eyebrow">{app.platform} · Release workspace</div><h1>{app.name}</h1><p>{app.assignments.length} assigned companies · {app.releases.length} uploaded versions</p></div><span className={`badge ${app.active ? '' : 'neutral'}`}>{app.active ? 'Active' : 'Disabled'}</span></div><div className="split"><section className="panel"><h2>Upload a new release</h2><ReleaseForm appId={id} maxMb={config.uploadMaxBytes / 1048576} extensions={config.extensions} /></section><section className="panel"><h2>App details</h2><details><summary>Edit app information</summary><AppForm app={app} /></details><div className="section-title"><h3>Assigned companies</h3></div>{app.assignments.map(({ company }) => <div className="row" key={company.id}><Link className="text-button" href={`/admin/companies/${company.id}`}>{company.name}</Link><span className={`badge ${company.active ? '' : 'neutral'}`}>{company.active ? 'Active' : 'Disabled'}</span></div>)}{!app.assignments.length && <p className="hint">Assign this app from a company’s management page.</p>}<Link className="text-button" href="/admin/companies">Manage assignments →</Link></section></div><div className="section-title"><h2>All versions</h2></div>{app.releases.map(release => <article className="release" key={release.id}><div className="release-heading"><div className="release-title"><h2>Version {release.version}</h2><span className={`badge ${release.published ? '' : 'neutral'}`}>{release.published ? 'Published' : 'Draft'}</span></div><DownloadButton id={release.id} version={release.version} /></div><p className="notes">{release.notes || 'No feature notes added.'}</p><div className="release-info"><span>{formatDate(release.publishedAt)}</span><span>{release.filename}</span><span>{formatSize(release.size)}</span></div><details style={{ marginTop: 18 }}><summary>Publication settings</summary><ReleasePublish id={release.id} published={release.published} /></details></article>)}{!app.releases.length && <div className="empty"><h2>No versions yet</h2><p>Upload your first release using the form above.</p></div>}</>;
+}

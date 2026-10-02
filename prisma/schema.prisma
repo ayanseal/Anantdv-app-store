@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+}
+datasource db {
+  provider = "sqlite"
+}
+enum Role {
+  ADMIN
+  CUSTOMER
+  VIEWER
+}
+model Company {
+  id String @id @default(cuid())
+  name String
+  slug String @unique
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users User[]
+  assignments CompanyApp[]
+}
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  name String
+  passwordHash String
+  role Role
+  companyId String?
+  company Company? @relation(fields: [companyId], references: [id])
+  active Boolean @default(true)
+  mustChangePassword Boolean @default(true)
+  authVersion Int @default(0)
+  mfaSecret String?
+  mfaEnabled Boolean @default(false)
+  lastTotpStep BigInt @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sessions RefreshSession[]
+  challenges AuthChallenge[]
+  recoveryCodes RecoveryCode[]
+  uploads Release[]
+  @@index([companyId])
+}
+model App {
+  id String @id @default(cuid())
+  name String
+  slug String @unique
+  description String
+  platform String
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  assignments CompanyApp[]
+  releases Release[]
+}
+model CompanyApp {
+  companyId String
+  appId String
+  company Company @relation(fields: [companyId], references: [id])
+  app App @relation(fields: [appId], references: [id])
+  @@id([companyId, appId])
+}
+model Release {
+  id String @id @default(cuid())
+  appId String
+  app App @relation(fields: [appId], references: [id])
+  version String
+  notes String
+  storageKey String @unique
+  filename String
+  contentType String
+  size Int
+  checksum String
+  published Boolean @default(false)
+  publishedAt DateTime?
+  uploaderId String
+  uploader User @relation(fields: [uploaderId], references: [id])
+  createdAt DateTime @default(now())
+  @@unique([appId, version])
+  @@index([appId, published, publishedAt])
+}
+model RefreshSession {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  tokenHash String @unique
+  family String
+  authVersion Int @default(0)
+  expiresAt DateTime
+  consumedAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, family])
+}
+model AuthChallenge {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  tokenHash String @unique
+  purpose String
+  authVersion Int @default(0)
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+}
+model RecoveryCode {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  codeHash String @unique
+  consumedAt DateTime?
+}
+model LoginThrottle {
+  key String @id
+  attempts Int @default(0)
+  expiresAt DateTime
+}
+model AuditEvent {
+  id String @id @default(cuid())
+  actorId String?
+  action String
+  targetId String?
+  metadata String @default("{}")
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
