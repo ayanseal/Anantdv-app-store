@@ -3,17 +3,18 @@ import { z } from 'zod';
 import QRCode from 'qrcode';
 import { db } from '@/server/db';
 import { route, json, jsonBody, assertMutationOrigin, attachSession, clearCookies, sessionCookieOptions, requestIp, getRequestPrincipal } from '@/server/http';
-import { login, changePassword, resolveChallenge, type LoginResult } from '@/server/auth/login';
+import { login, changePassword, resolveChallenge, resetPasswordWithPrevious, type LoginResult } from '@/server/auth/login';
 import { beginEnrollment, finishEnrollment, verifyAdminFactor } from '@/server/auth/mfa';
 import { admitAttempt } from '@/server/auth/throttle';
 import { issueSession, rotateSession, logoutToken } from '@/server/auth/sessions';
 import { tokenHash } from '@/server/auth/password';
 import { recordAudit } from '@/server/audit';
+import { isMfaDisabled } from '@/server/auth/principal';
 import { unauthorized, AppError } from '@/server/errors';
 type Context = { params: Promise<{ action: string }> };
 function loginResponse(result: LoginResult) {
-  if (result.kind === 'session') return attachSession(json({ kind: 'session' }), result.tokens);
-  const response = json({ kind: result.kind });
+  if (result.kind === 'session') return attachSession(json({ kind: 'session', role: result.role }), result.tokens);
+  const response = json({ kind: result.kind, role: result.role });
   response.cookies.set('payana_challenge', result.challengeToken, { ...sessionCookieOptions(), maxAge: 600 });
   response.cookies.set('payana_access', '', { ...sessionCookieOptions(), maxAge: 0 });
   response.cookies.set('payana_refresh', '', { ...sessionCookieOptions(), maxAge: 0 });
@@ -24,10 +25,12 @@ export async function GET(_request: Request, context: Context) {
     const { action } = await context.params;
     if (action !== 'state') throw new AppError('NOT_FOUND', 404, 'Not found.');
     try { const principal = await getRequestPrincipal(); return json({ kind: 'session', role: principal.role }); } catch {}
-    const token = (await cookies()).get('payana_challenge')?.value;
-    if (token) {
-      const challenge = await db.authChallenge.findUnique({ where: { tokenHash: tokenHash(token) } });
-      if (challenge) { try { await resolveChallenge(token, challenge.purpose); return json({ kind: challenge.purpose }); } catch {} }
+    if (!isMfaDisabled()) {
+      const token = (await cookies()).get('payana_challenge')?.value;
+      if (token) {
+        const challenge = await db.authChallenge.findUnique({ where: { tokenHash: tokenHash(token) } });
+        if (challenge) { try { await resolveChallenge(token, challenge.purpose); return json({ kind: challenge.purpose }); } catch {} }
+      }
     }
     return json({ kind: 'login' });
   });
@@ -45,6 +48,14 @@ export async function POST(request: Request, context: Context) {
     if (action === 'login') {
       const input = z.object({ email: z.string().max(254), password: z.string().max(128) }).parse(await jsonBody(request));
       return loginResponse(await login(input.email, input.password, requestIp(request)));
+    }
+    if (action === 'reset-password') {
+      const input = z.object({
+        email: z.string().max(254),
+        previousPassword: z.string().max(128),
+        newPassword: z.string().min(12).max(128),
+      }).parse(await jsonBody(request));
+      return loginResponse(await resetPasswordWithPrevious(input.email, input.previousPassword, input.newPassword, requestIp(request)));
     }
     const challenge = jar.get('payana_challenge')?.value;
     if (!challenge) throw unauthorized();

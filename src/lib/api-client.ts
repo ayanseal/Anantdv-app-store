@@ -7,7 +7,12 @@ export async function refreshSession() {
     return (await fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' })).ok;
   };
   if (!refreshPromise) {
-    const work = () => typeof navigator !== 'undefined' && navigator.locks ? navigator.locks.request('payana-session-refresh', renew) : renew();
+    const work = () =>
+      typeof navigator !== 'undefined' &&
+      (typeof window !== 'undefined' ? window.isSecureContext : false) &&
+      navigator.locks
+        ? navigator.locks.request('payana-session-refresh', renew)
+        : renew();
     refreshPromise = work().finally(() => { refreshPromise = null; });
   }
   return refreshPromise;

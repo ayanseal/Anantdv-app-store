@@ -7,6 +7,7 @@ it('rejects missing and foreign mutation origins', () => {
   expect(() => assertMutationOrigin(new Request('http://localhost:3000/api/auth/login', { method: 'POST' }))).toThrow();
   expect(() => assertMutationOrigin(new Request('http://localhost:3000/api/auth/login', { method: 'POST', headers: { origin: 'https://evil.example' } }))).toThrow();
   expect(() => assertMutationOrigin(new Request('http://localhost:3000/api/auth/login', { method: 'POST', headers: { origin: 'http://localhost:3000' } }))).not.toThrow();
+  expect(() => assertMutationOrigin(new Request('http://192.168.1.15:3000/api/auth/login', { method: 'POST', headers: { origin: 'http://192.168.1.15:3000', host: '192.168.1.15:3000' } }))).not.toThrow();
 });
 it('uses HttpOnly secure production cookies', () => {
   expect(sessionCookieOptions(true)).toMatchObject({ secure: true, httpOnly: true, sameSite: 'strict', path: '/' });

@@ -29,7 +29,7 @@ it('encrypts enrollment secrets and consumes recovery codes once', async () => {
   const user = await db.user.findUniqueOrThrow({ where: { id: f.admin.id } });
   expect(user.mfaSecret).not.toContain(enrollment.secret);
   await expect(finishEnrollment(f.admin.id, 'invalid')).rejects.toThrow();
-  const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(enrollment.secret), issuer: 'Payana App Store', label: f.admin.email, algorithm: 'SHA1', digits: 6, period: 30 });
+  const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(enrollment.secret), issuer: 'Anantdv App Store', label: f.admin.email, algorithm: 'SHA1', digits: 6, period: 30 });
   const { recoveryCodes } = await finishEnrollment(f.admin.id, totp.generate());
   expect(recoveryCodes).toHaveLength(10);
   await expect(finishEnrollment(f.admin.id, totp.generate())).rejects.toThrow();

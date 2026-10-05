@@ -1,4 +1,4 @@
-# Payana App Store
+# Anantdv App Store
 
 A private Next.js app distribution portal for company customers. Administrators create individual accounts, assign apps to companies, publish binaries and feature notes, and manage version history.
 
@@ -13,16 +13,37 @@ A private Next.js app distribution portal for company customers. Administrators 
 
 ## Run locally
 
-Use Node.js **24 LTS** (minimum 22.13), npm, and a persistent local disk. On PowerShell, use `npm.cmd` if script execution policy blocks `npm`.
+## Quick Setup (After Cloning from GitHub)
 
-```powershell
-npm.cmd ci
-npm.cmd run setup:env
-npm.cmd run db:generate
-npm.cmd run db:migrate
-```
+1. **Clone and install dependencies**:
+   ```bash
+   git clone <your-repo-url>
+   cd panaya_app_store
+   npm install
+   ```
 
-`setup:env` creates `.env` with unique random signing/encryption keys. It never overwrites an existing file. The included `.env.example` documents every setting. SQLite and uploads default to `data/payana.db` and `data/uploads`; neither is public or committed.
+2. **Configure environment & secrets**:
+   ```bash
+   npm run setup:env
+   ```
+   > 🔒 **Security Note**: All credentials, tokens, session keys, SQLite database files (`data/`), and uploaded app binaries are ignored by `.gitignore`. The **only** place application secrets exist is your local `.env` file, which is never committed to GitHub.
+
+3. **Initialize database schema**:
+   ```bash
+   npm run db:generate
+   npm run db:migrate
+   ```
+
+4. **Create initial admin account** (optional: set `BOOTSTRAP_ADMIN_EMAIL` & `BOOTSTRAP_ADMIN_PASSWORD` in `.env`):
+   ```bash
+   npm run admin:create
+   ```
+
+5. **Start development server**:
+   ```bash
+   npm run dev
+   ```
+   Access locally at `http://localhost:3000` or from network devices at `http://<your-ip>:3000`.
 
 Set these values in your private `.env` before creating your first administrator:
 

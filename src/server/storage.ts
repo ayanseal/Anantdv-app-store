@@ -13,9 +13,53 @@ export function attachmentHeader(input: string) {
   const ascii = name.replace(/[^\x20-\x7e]/g, '_');
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name).replace(/['()*]/g, c => '%' + c.charCodeAt(0).toString(16))}`;
 }
-function storagePath(key: string) {
-  if (!/^[a-f0-9-]{36}$/.test(key)) throw new AppError('FILE', 400, 'Invalid file key.');
-  return path.join(getConfig().uploadDir, key);
+export function storagePath(key: string) {
+  if (!key || typeof key !== 'string') {
+    throw new AppError('FILE', 400, 'Invalid file key.');
+  }
+  const normalized = key.replace(/\\/g, '/');
+  if (normalized.includes('..') || path.isAbsolute(key) || normalized.startsWith('/') || /[\x00-\x1f\x7f<>:"|?*]/.test(normalized)) {
+    throw new AppError('FILE', 400, 'Invalid file key.');
+  }
+  const uploadDirResolved = path.resolve(getConfig().uploadDir);
+  const fullPath = path.resolve(uploadDirResolved, normalized);
+  if (!fullPath.startsWith(uploadDirResolved)) {
+    throw new AppError('FILE', 400, 'Invalid file path traversal.');
+  }
+  return fullPath;
+}
+
+export async function relocateToAppFolder(
+  sourceKey: string,
+  appSlug: string,
+  version: string,
+  originalFilename: string,
+  metadata?: Record<string, unknown>
+): Promise<string> {
+  const config = getConfig();
+  const safeSlug = appSlug.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const safeVer = version.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const safeName = safeFilename(originalFilename);
+  const relDir = path.join('apps', safeSlug, 'releases', `v${safeVer}`);
+  const targetDir = path.join(config.uploadDir, relDir);
+  await fs.mkdir(targetDir, { recursive: true });
+
+  const destFile = path.join(targetDir, safeName);
+  const srcFile = storagePath(sourceKey);
+
+  try {
+    await fs.rename(srcFile, destFile);
+  } catch {
+    await fs.copyFile(srcFile, destFile);
+    await fs.unlink(srcFile).catch(() => {});
+  }
+
+  if (metadata) {
+    const metaPath = path.join(targetDir, 'release-info.json');
+    await fs.writeFile(metaPath, JSON.stringify(metadata, null, 2), 'utf-8');
+  }
+
+  return path.join(relDir, safeName).replace(/\\/g, '/');
 }
 export async function storeReadable(source: Readable, originalName: string): Promise<StoredFile> {
   const config = getConfig();
@@ -84,4 +128,35 @@ export async function readMultipart(request: Request): Promise<{ fields: Record<
     if (stored) await removeStoredFile(stored.key);
     throw error;
   }
+}
+export async function readMultipartImage(request: Request): Promise<{ path: string; filename: string; contentType: string; size: number }> {
+  const maxBytes = 2 * 1024 * 1024;
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    throw new AppError('VALIDATION', 400, 'Invalid image upload.');
+  }
+  const file = formData.get('file');
+  if (!file || !(file instanceof File) || file.size === 0) {
+    throw new AppError('VALIDATION', 400, 'Select an image file to upload.');
+  }
+  if (file.size > maxBytes) {
+    throw new AppError('TOO_LARGE', 413, 'Image must be under 2 MB.');
+  }
+  const safeFile = safeFilename(file.name || 'icon.png');
+  const ext = safeFile.split('.').pop()?.toLowerCase() || 'png';
+  const mimeFromExt: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+  const contentType = (file.type && file.type !== 'application/octet-stream')
+    ? file.type
+    : (mimeFromExt[ext] ?? 'image/png');
+  if (!contentType.startsWith('image/')) {
+    throw new AppError('VALIDATION', 400, 'File must be an image (PNG, JPG, WebP, GIF, SVG).');
+  }
+  const config = getConfig();
+  await fs.mkdir(config.uploadDir, { recursive: true });
+  const tmpPath = path.join(config.uploadDir, `img-${randomUUID()}.tmp`);
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(tmpPath, buffer);
+  return { path: tmpPath, filename: safeFile, contentType, size: buffer.length };
 }

@@ -11,7 +11,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
@@ -22,7 +22,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:dev": "prisma migrate dev",
     "admin:create": "tsx scripts/bootstrap-admin.ts",
-    "setup:env": "tsx scripts/setup-env.ts"
+    "setup:env": "tsx scripts/setup-env.ts",
+    "reset": "tsx scripts/reset-project.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.10.0",

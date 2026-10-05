@@ -18,7 +18,7 @@ function decryptSecret(value: string) {
   cipher.setAuthTag(Buffer.from(tag, 'hex'));
   return Buffer.concat([cipher.update(Buffer.from(ciphertext, 'hex')), cipher.final()]).toString('utf8');
 }
-const totpFor = (secret: string, email: string) => new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(secret), issuer: 'Payana App Store', label: email, algorithm: 'SHA1', digits: 6, period: 30 });
+const totpFor = (secret: string, email: string) => new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(secret), issuer: 'Anantdv App Store', label: email, algorithm: 'SHA1', digits: 6, period: 30 });
 export async function beginEnrollment(userId: string, challengeToken?: string) {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
   if (user.role !== 'ADMIN' || !user.active || user.mfaEnabled || user.mustChangePassword) throw unauthorized();

@@ -1,9 +1,9 @@
-import { Package, ShieldCheck, History } from 'lucide-react';
+import { Package, ShieldCheck, KeyRound } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { getRequestPrincipal } from '@/server/http';
 import { LoginForm } from '@/components/login-form';
 
-export default async function LoginPage() {
+export default async function ForgotPasswordPage() {
   try {
     const principal = await getRequestPrincipal();
     if (principal) {
@@ -19,18 +19,18 @@ export default async function LoginPage() {
           <span>Anantdv<small>APP STORE</small></span>
         </div>
         <div className="story-body">
-          <div className="eyebrow">Built for your company</div>
-          <h1>The right apps.<br /><em>Ready for you.</em></h1>
-          <p>One place for your company’s apps. Get the latest releases, see what’s new, and find the versions you need.</p>
+          <div className="eyebrow">Account Recovery</div>
+          <h1>Reset your password.<br /><em>Keep building.</em></h1>
+          <p>Verify your previous credentials to set a new password and securely regain access to your workspace and apps.</p>
           <div className="story-points">
-            <span><ShieldCheck size={16} /> Secure access</span>
-            <span><History size={16} /> Every version</span>
+            <span><ShieldCheck size={16} /> Previous password verification</span>
+            <span><KeyRound size={16} /> Instant password update</span>
           </div>
         </div>
         <small>© {new Date().getFullYear()} Anantdv App Store</small>
       </section>
       <section className="auth-content">
-        <LoginForm />
+        <LoginForm initialMode="forgot" />
       </section>
     </main>
   );

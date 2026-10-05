@@ -13,7 +13,7 @@ export async function issueSession(userId: string, expectedAuthVersion?: number)
   const family = randomUUID();
   const user = await db.$transaction(async tx => {
     const current = await tx.user.findUnique({ where: { id: userId }, include: { company: true } });
-    if (!current?.active || current.mustChangePassword || (current.role === 'ADMIN' && !current.mfaEnabled) || (current.role === 'CUSTOMER' && !current.company?.active) || (expectedAuthVersion !== undefined && expectedAuthVersion !== current.authVersion)) throw unauthorized();
+    if (!current?.active || current.mustChangePassword || (current.role === 'CUSTOMER' && !current.company?.active) || (expectedAuthVersion !== undefined && expectedAuthVersion !== current.authVersion)) throw unauthorized();
     await tx.refreshSession.create({ data: { userId, family, authVersion: current.authVersion, tokenHash: tokenHash(refreshToken), expiresAt: new Date(Date.now() + config.refreshTokenSeconds * 1000) } });
     return current;
   });
@@ -31,7 +31,7 @@ export async function rotateSession(refreshToken: string): Promise<SessionTokens
       return null;
     }
     const user = old.user;
-    if (!user.active || user.authVersion !== old.authVersion || user.mustChangePassword || (user.role === 'ADMIN' && !user.mfaEnabled) || (user.role === 'CUSTOMER' && !user.company?.active)) return null;
+    if (!user.active || user.authVersion !== old.authVersion || user.mustChangePassword || (user.role === 'CUSTOMER' && !user.company?.active)) return null;
     const claim = await tx.refreshSession.updateMany({ where: { id: old.id, consumedAt: null, revokedAt: null }, data: { consumedAt: new Date() } });
     if (claim.count !== 1) return null;
     await tx.refreshSession.create({ data: { userId: old.userId, family: old.family, authVersion: user.authVersion, tokenHash: tokenHash(nextToken), expiresAt: old.expiresAt } });

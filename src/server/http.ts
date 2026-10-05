@@ -5,9 +5,44 @@ import { getConfig } from '@/config/env';
 import { AppError, unauthorized } from './errors';
 import { principalFromAccess, type SessionTokens } from './auth/sessions';
 export function assertMutationOrigin(request: Request) {
-  if (request.headers.get('origin') !== getConfig().origin || request.headers.get('sec-fetch-site') === 'cross-site') throw new AppError('CSRF', 403, 'Invalid request origin.');
+  const origin = request.headers.get('origin');
+  if (!origin || request.headers.get('sec-fetch-site') === 'cross-site') {
+    throw new AppError('CSRF', 403, 'Invalid request origin.');
+  }
+  const configured = getConfig().origin;
+  if (origin === configured) return;
+
+  // Allow same-host origin when accessing via IP, localhost, or network hostname
+  try {
+    const originUrl = new URL(origin);
+    const hostHeader = request.headers.get('x-forwarded-host') || request.headers.get('host');
+    const reqUrl = new URL(request.url);
+    const expectedHost = hostHeader || reqUrl.host;
+    if (originUrl.host === expectedHost) return;
+    if (originUrl.hostname === expectedHost.replace(/:\d+$/, '')) return;
+
+    // Allow LAN / loopback IPs in local development
+    if (
+      originUrl.hostname === 'localhost' ||
+      originUrl.hostname === '127.0.0.1' ||
+      /^192\.168\.\d{1,3}\.\d{1,3}$/.test(originUrl.hostname) ||
+      /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(originUrl.hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(originUrl.hostname)
+    ) {
+      return;
+    }
+  } catch {}
+
+  throw new AppError('CSRF', 403, 'Invalid request origin.');
 }
-export function sessionCookieOptions(production = getConfig().production) { return { httpOnly: true, secure: production, sameSite: 'strict' as const, path: '/' }; }
+export function sessionCookieOptions(production = getConfig().production) {
+  return {
+    httpOnly: true,
+    secure: production,
+    sameSite: (production ? 'strict' : 'lax') as 'strict' | 'lax',
+    path: '/'
+  };
+}
 export function attachSession(response: NextResponse, tokens: SessionTokens) {
   response.cookies.set('payana_access', tokens.accessToken, { ...sessionCookieOptions(), maxAge: tokens.accessSeconds });
   response.cookies.set('payana_refresh', tokens.refreshToken, { ...sessionCookieOptions(), maxAge: tokens.refreshSeconds });
@@ -49,8 +84,9 @@ export async function route(handler: () => Promise<Response>) {
     if (error instanceof AppError) return json({ error: { code: error.code, message: error.message } }, error.status);
     if (error instanceof ZodError) return json({ error: { code: 'VALIDATION', message: error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ') } }, 400);
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') return json({ error: { code: 'CONFLICT', message: 'This email, slug, or version already exists.' } }, 409);
-    console.error('Request failed:', error instanceof Error ? error.name : 'Unknown error');
-    return json({ error: { code: 'INTERNAL', message: 'The request could not be completed.' } }, 500);
+    console.error('Request failed:', error);
+    const message = error instanceof Error ? error.message : 'The request could not be completed.';
+    return json({ error: { code: 'INTERNAL', message: process.env.NODE_ENV === 'production' ? 'The request could not be completed.' : message } }, 500);
   }
 }
 export function requestIp(request: Request) { return getConfig().trustProxy ? (request.headers.get('x-forwarded-for')?.split(',')[0].trim().slice(0, 80) || 'unknown') : 'local'; }
