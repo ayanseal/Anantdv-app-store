@@ -1,9 +1,10 @@
 import { db } from '@/server/db';
 import { requirePagePrincipal } from '@/server/page-auth';
-import { requireAdmin } from '@/server/auth/principal';
+import { requireAdminOrViewer } from '@/server/auth/principal';
 import { formatDate } from '@/lib/format';
 export default async function AuditPage() {
-  requireAdmin(await requirePagePrincipal('/admin/audit'));
+  const actor = await requirePagePrincipal('/admin/audit');
+  requireAdminOrViewer(actor);
   const events = await db.auditEvent.findMany({ orderBy: { createdAt: 'desc' }, take: 200 });
   const ids = [...new Set(events.map(e => e.actorId).filter((id): id is string => !!id))];
   const users = await db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });

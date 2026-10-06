@@ -86,16 +86,25 @@ export async function setReleasePublished(actor: Principal, releaseId: string, p
 }
 export async function openDownload(actor: Principal | null, releaseId: string) {
   const release = await db.release.findUnique({ where: { id: releaseId }, include: { app: { select: { isPublic: true, active: true } } } });
-  if (!release || !release.published) throw forbidden();
-  // Public app: anyone can download without an account
-  if (release.app.isPublic && release.app.active) {
+  if (!release) throw forbidden();
+
+  let principal: Principal | null = null;
+  if (actor) {
+    principal = await loadPrincipal(actor.id);
+  }
+
+  const isStaff = principal && (principal.role === 'ADMIN' || principal.role === 'VIEWER');
+  if (!release.published && !isStaff) throw forbidden();
+
+  // Public app: anyone can download published releases without an account
+  if (release.app.isPublic && release.app.active && release.published) {
     const stream = await openStoredFile(release.storageKey);
     if (release.size <= 0) throw new AppError('FILE_MISSING', 404, 'This binary is unavailable.');
     return { stream, filename: release.filename, size: release.size, contentType: release.contentType };
   }
-  // Private app: must be authenticated with access
-  if (!actor) throw forbidden();
-  const principal = await loadPrincipal(actor.id);
+
+  // Private app or unreleased draft: must be authenticated with access
+  if (!principal) throw forbidden();
   await requireAppAccess(principal, release.appId, 'download');
   const stream = await openStoredFile(release.storageKey);
   if (release.size <= 0) throw new AppError('FILE_MISSING', 404, 'This binary is unavailable.');

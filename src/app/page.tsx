@@ -40,20 +40,57 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </Link>
         <nav className="public-nav">
           {principal ? (
-            <Link
-              href={principal.role === 'ADMIN' ? '/admin' : '/catalog'}
-              className="public-user-chip"
-              title={`Logged in as ${principal.email} (${principal.role})`}
-            >
-              <div className="avatar small">{principal.email.slice(0, 2).toUpperCase()}</div>
-              <span className="user-chip-label">{principal.role === 'ADMIN' ? 'Admin Console' : 'Dashboard'}</span>
-              <LayoutDashboard size={14} className="user-chip-icon" />
-            </Link>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {(principal.role === 'ADMIN' || principal.role === 'VIEWER') && (
+                <Link href="/admin" className="button small">
+                  <LayoutDashboard size={13} />
+                  <span>Admin Panel</span>
+                </Link>
+              )}
+              <Link href="/catalog" className="button secondary small">
+                <Layers size={13} />
+                <span>{principal.role === 'CUSTOMER' ? 'Dashboard' : 'App Library'}</span>
+              </Link>
+              <div
+                className="public-user-chip"
+                title={`Signed in as ${principal.email} (${principal.role})`}
+              >
+                <div className="avatar small">{principal.email.slice(0, 2).toUpperCase()}</div>
+                <span className="user-chip-label">{principal.role}</span>
+              </div>
+            </div>
           ) : (
             <Link href="/login" className="button secondary small"><LogIn size={13} />Sign in</Link>
           )}
         </nav>
       </header>
+
+      {/* Logged-in Staff & Customer Command Strip */}
+      {principal && (
+        <aside className="home-dashboard-banner">
+          <div className="home-dashboard-banner-inner">
+            <div className="home-dashboard-user">
+              <div className="avatar small">{principal.email.slice(0, 2).toUpperCase()}</div>
+              <div>
+                <span>Signed in as <strong>{principal.name || principal.email}</strong></span>
+                <span className="role-tag">{principal.role}</span>
+              </div>
+            </div>
+            <div className="home-dashboard-actions">
+              {(principal.role === 'ADMIN' || principal.role === 'VIEWER') && (
+                <Link href="/admin" className="button small">
+                  <LayoutDashboard size={14} />
+                  <span>Admin Panel</span>
+                </Link>
+              )}
+              <Link href="/catalog" className="button secondary small">
+                <Layers size={14} />
+                <span>{principal.role === 'CUSTOMER' ? 'Customer Dashboard' : 'App Library'}</span>
+              </Link>
+            </div>
+          </div>
+        </aside>
+      )}
 
       {/* Hero */}
       <section className="public-hero">
@@ -213,8 +250,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               <p>Sign in with your work credentials to access proprietary internal applications, staging channels, and assigned release binaries.</p>
             </div>
           </div>
-          <Link href={principal ? (principal.role === 'ADMIN' ? '/admin' : '/catalog') : '/login'} className="enterprise-card-btn">
-            {principal ? 'Go to your dashboard' : 'Sign in to workspace'}
+          <Link href={principal ? ((principal.role === 'ADMIN' || principal.role === 'VIEWER') ? '/admin' : '/catalog') : '/login'} className="enterprise-card-btn">
+            {principal ? ((principal.role === 'ADMIN' || principal.role === 'VIEWER') ? 'Go to Admin Panel' : 'Go to Dashboard') : 'Sign in to workspace'}
             <ArrowRight size={15} />
           </Link>
         </section>

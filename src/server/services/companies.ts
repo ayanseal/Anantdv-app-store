@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { db } from '@/server/db';
-import { loadPrincipal, requireAdmin, type Principal } from '@/server/auth/principal';
+import { loadPrincipal, requireAdmin, requireAdminOrViewer, type Principal } from '@/server/auth/principal';
 import { recordAudit } from '@/server/audit';
 export const companyInput = z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(100), slug: z.string().trim().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), active: z.boolean() });
 export type CompanyInput = z.infer<typeof companyInput>;
 export async function listCompanies(actor: Principal) {
-  requireAdmin(await loadPrincipal(actor.id));
+  requireAdminOrViewer(await loadPrincipal(actor.id));
   return db.company.findMany({ orderBy: { name: 'asc' }, include: { _count: { select: { users: true, assignments: true } } } });
 }
 export async function saveCompany(actor: Principal, raw: CompanyInput) {

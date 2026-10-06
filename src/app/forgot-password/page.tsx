@@ -7,7 +7,7 @@ export default async function ForgotPasswordPage() {
   try {
     const principal = await getRequestPrincipal();
     if (principal) {
-      redirect(principal.role === 'ADMIN' ? '/admin' : '/catalog');
+      redirect((principal.role === 'ADMIN' || principal.role === 'VIEWER') ? '/admin' : '/catalog');
     }
   } catch {}
 

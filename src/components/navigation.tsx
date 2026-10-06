@@ -40,10 +40,10 @@ export function Navigation({ principal, children }: { principal: Principal; chil
             </Link>
           ))}
 
-          {/* Admin: toggle between admin panel and app library */}
-          {principal.role === 'ADMIN' && (
+          {/* Admin / Viewer: toggle between admin panel and app library */}
+          {(principal.role === 'ADMIN' || principal.role === 'VIEWER') && (
             <Link className={`nav-item ${admin ? '' : 'active'}`} href={admin ? '/catalog' : '/admin'}>
-              {admin ? <><LayoutGrid size={17} />App library</> : <><Layers size={17} />Administration</>}
+              {admin ? <><LayoutGrid size={17} />App library</> : <><Layers size={17} />{principal.role === 'ADMIN' ? 'Administration' : 'Admin panel'}</>}
             </Link>
           )}
         </nav>

@@ -431,6 +431,46 @@ h1, h2, h3, p, .hint, .muted, .release-info, .row small { overflow-wrap: anywher
   z-index: 50;
 }
 
+/* ── Home Logged-in Dashboard Banner ── */
+.home-dashboard-banner {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(22, 60, 46, 0.08);
+  padding: 10px 42px;
+}
+.home-dashboard-banner-inner {
+  max-width: 1380px;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.home-dashboard-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #17382b;
+}
+.home-dashboard-user .role-tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #e6f3eb;
+  color: #165b40;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid #c1decb;
+}
+.home-dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* ── Modern Public Hero with Ambient Mesh Gradient ── */
 .public-hero {
   position: relative;

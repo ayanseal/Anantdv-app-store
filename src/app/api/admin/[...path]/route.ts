@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { db } from '@/server/db';
 import { route, json, jsonBody, assertMutationOrigin, getRequestPrincipal } from '@/server/http';
-import { requireAdmin } from '@/server/auth/principal';
+import { requireAdmin, requireAdminOrViewer } from '@/server/auth/principal';
 import { listCompanies, saveCompany } from '@/server/services/companies';
 import { listUsers, saveUser, resetUserPassword, resetUserMfa } from '@/server/services/users';
 import { listAdminApps, saveApp, setCompanyApps, setAppCompanies, saveAppIcon, saveCompanyLogo, deleteApp } from '@/server/services/apps';
@@ -14,7 +14,7 @@ import nodePath from 'node:path';
 type Context = { params: Promise<{ path: string[] }> };
 export async function GET(_request: Request, context: Context) {
   return route(async () => {
-    const actor = await getRequestPrincipal(); requireAdmin(actor);
+    const actor = await getRequestPrincipal(); requireAdminOrViewer(actor);
     const { path } = await context.params;
     if (path.length !== 1 && !(path.length === 3 && path[0] === 'apps' && path[2] === 'icon')) throw new AppError('NOT_FOUND', 404, 'Not found.');
     if (path.length === 3 && path[0] === 'apps' && path[2] === 'icon') {

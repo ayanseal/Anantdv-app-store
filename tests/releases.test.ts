@@ -12,13 +12,24 @@ it('enforces publication and company permissions for downloads', async () => {
   const customer = await loadPrincipal(f.customer.id);
   const viewer = await loadPrincipal(f.viewer.id);
   const release = await createRelease(admin, f.app.id, { version: '1.0', notes: 'New features', published: false }, new File(['binary'], 'app.apk'));
+  // Unreleased draft: customer is rejected, but viewer (staff) can download
   await expect(openDownload(customer, release.id)).rejects.toThrow();
+  const viewerDraft = await openDownload(viewer, release.id);
+  expect(await new Response(viewerDraft.stream).text()).toBe('binary');
+
   await setReleasePublished(admin, release.id, true);
   const download = await openDownload(customer, release.id);
   expect(await new Response(download.stream).text()).toBe('binary');
-  await expect(openDownload(viewer, release.id)).rejects.toThrow();
+  const viewerPub = await openDownload(viewer, release.id);
+  expect(await new Response(viewerPub.stream).text()).toBe('binary');
+
   const foreign = await createRelease(admin, f.foreign.id, { version: '1.0', notes: 'Foreign features', published: true }, new File(['other'], 'other.ipa'));
   await expect(openDownload(customer, foreign.id)).rejects.toThrow();
+  // Viewer can download foreign company release too like an admin
+  const viewerForeign = await openDownload(viewer, foreign.id);
+  expect(await new Response(viewerForeign.stream).text()).toBe('other');
+
+  // Viewer cannot create releases
   await expect(createRelease(viewer, f.app.id, { version: '2.0', notes: '', published: true }, new File(['evil'], 'app.apk'))).rejects.toThrow();
 });
 it('cleans up duplicate releases and reports missing files', async () => {

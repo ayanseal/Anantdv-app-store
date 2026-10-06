@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { db } from '@/server/db';
-import { loadPrincipal, requireAdmin, type Principal } from '@/server/auth/principal';
+import { loadPrincipal, requireAdmin, requireAdminOrViewer, type Principal } from '@/server/auth/principal';
 import { hashPassword, temporaryPassword } from '@/server/auth/password';
 import { recordAudit } from '@/server/audit';
 import { AppError } from '@/server/errors';
 export const userInput = z.object({ id: z.string().optional(), email: z.string().trim().toLowerCase().max(254).pipe(z.email()), name: z.string().trim().min(1).max(100), role: z.enum(['ADMIN', 'CUSTOMER', 'VIEWER']), companyId: z.string().nullable().default(null), active: z.boolean() });
 export type UserInput = z.input<typeof userInput>;
 export const publicUserSelect = { id: true, email: true, name: true, role: true, companyId: true, active: true, mustChangePassword: true, mfaEnabled: true, createdAt: true, company: { select: { name: true } } } as const;
-export async function listUsers(actor: Principal) { requireAdmin(await loadPrincipal(actor.id)); return db.user.findMany({ select: publicUserSelect, orderBy: { createdAt: 'desc' } }); }
+export async function listUsers(actor: Principal) { requireAdminOrViewer(await loadPrincipal(actor.id)); return db.user.findMany({ select: publicUserSelect, orderBy: { createdAt: 'desc' } }); }
 export async function saveUser(actor: Principal, raw: UserInput) {
   requireAdmin(await loadPrincipal(actor.id));
   const input = userInput.parse(raw);

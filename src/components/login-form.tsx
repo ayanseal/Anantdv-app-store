@@ -12,7 +12,7 @@ export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | '
   const [busy, setBusy] = useState(false);
 
   function handleSuccess(role?: string) {
-    const destination = role === 'ADMIN' ? '/admin' : '/catalog';
+    const destination = (role === 'ADMIN' || role === 'VIEWER') ? '/admin' : '/catalog';
     window.location.replace(destination);
   }
 

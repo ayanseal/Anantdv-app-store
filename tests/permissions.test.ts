@@ -3,16 +3,18 @@ import { db } from '@/server/db';
 import { loadPrincipal, requireAppAccess } from '@/server/auth/principal';
 import { fixture, resetDb } from './helpers';
 beforeEach(resetDb);
-it('isolates customer apps and denies viewer downloads', async () => {
+it('isolates customer apps and allows staff (admin and viewer) global app access and downloads', async () => {
   const f = await fixture();
   const customer = await loadPrincipal(f.customer.id);
   const viewer = await loadPrincipal(f.viewer.id);
+  const admin = await loadPrincipal(f.admin.id);
   await expect(requireAppAccess(customer, f.app.id, 'download')).resolves.toBeUndefined();
   await expect(requireAppAccess(customer, f.foreign.id, 'browse')).rejects.toThrow();
   await expect(requireAppAccess(customer, f.foreign.id, 'download')).rejects.toThrow();
   await expect(requireAppAccess(viewer, f.foreign.id, 'browse')).resolves.toBeUndefined();
-  await expect(requireAppAccess(viewer, f.app.id, 'download')).rejects.toThrow();
-  await expect(requireAppAccess(await loadPrincipal(f.admin.id), f.foreign.id, 'download')).resolves.toBeUndefined();
+  await expect(requireAppAccess(viewer, f.app.id, 'download')).resolves.toBeUndefined();
+  await expect(requireAppAccess(viewer, f.foreign.id, 'download')).resolves.toBeUndefined();
+  await expect(requireAppAccess(admin, f.foreign.id, 'download')).resolves.toBeUndefined();
 });
 it('removes access immediately when an assignment is removed', async () => {
   const f = await fixture();

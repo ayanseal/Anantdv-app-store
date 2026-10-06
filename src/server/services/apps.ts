@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/server/db';
-import { loadPrincipal, requireAdmin, requireAppAccess, type Principal } from '@/server/auth/principal';
+import { loadPrincipal, requireAdmin, requireAdminOrViewer, requireAppAccess, type Principal } from '@/server/auth/principal';
 import { recordAudit } from '@/server/audit';
 import { AppError } from '@/server/errors';
 export const appInput = z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(100), slug: z.string().trim().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), description: z.string().trim().max(3000), platform: z.enum(['Android', 'iOS', 'Windows', 'macOS', 'Linux', 'Other']), active: z.boolean(), isPublic: z.boolean().optional().default(false) });
@@ -120,8 +120,8 @@ export async function saveCompanyLogo(actor: Principal, companyId: string, file:
   await recordAudit({ actorId: actor.id, action: 'COMPANY_UPDATED', targetId: companyId, metadata: { logo: true } });
   return { logoUrl };
 }
-export async function listAdminApps(actor: Principal) { requireAdmin(await loadPrincipal(actor.id)); return db.app.findMany({ orderBy: { name: 'asc' }, include: { _count: { select: { releases: true, assignments: true } } } }); }
-export async function getAdminApp(actor: Principal, appId: string) { requireAdmin(await loadPrincipal(actor.id)); return db.app.findUniqueOrThrow({ where: { id: appId }, include: { releases: { orderBy: { createdAt: 'desc' }, select: releaseSelect }, assignments: { include: { company: true } } } }); }
+export async function listAdminApps(actor: Principal) { requireAdminOrViewer(await loadPrincipal(actor.id)); return db.app.findMany({ orderBy: { name: 'asc' }, include: { _count: { select: { releases: true, assignments: true } } } }); }
+export async function getAdminApp(actor: Principal, appId: string) { requireAdminOrViewer(await loadPrincipal(actor.id)); return db.app.findUniqueOrThrow({ where: { id: appId }, include: { releases: { orderBy: { createdAt: 'desc' }, select: releaseSelect }, assignments: { include: { company: true } } } }); }
 
 export async function deleteApp(actor: Principal, appId: string, purgeFiles: boolean = false) {
   requireAdmin(await loadPrincipal(actor.id));

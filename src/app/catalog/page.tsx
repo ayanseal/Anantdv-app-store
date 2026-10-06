@@ -13,16 +13,16 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const principal = await requirePagePrincipal('/catalog');
   const filters = await searchParams;
   const apps = await listCatalog(principal, filters);
-  const canDownload = principal.role !== 'VIEWER';
+  const canDownload = true;
 
   return <>
     <div className="page-heading">
       <div>
         <div className="eyebrow">{principal.companyName || (principal.role === 'ADMIN' ? 'All companies' : 'Anantdv workspace')}</div>
         <h1>App store</h1>
-        <p>{principal.role === 'ADMIN' ? 'All published apps across every company.' : principal.role === 'VIEWER' ? 'Browse apps and release history across the library.' : 'Your company apps — download the latest versions.'}</p>
+        <p>{principal.role === 'ADMIN' ? 'All published apps across every company.' : principal.role === 'VIEWER' ? 'Browse and download apps across all company workspaces.' : 'Your company apps — download the latest versions.'}</p>
       </div>
-      <span className="badge"><ShieldCheck size={12} />{principal.role === 'ADMIN' ? 'Admin access' : principal.role === 'VIEWER' ? 'View-only' : 'Private workspace'}</span>
+      <span className="badge"><ShieldCheck size={12} />{principal.role === 'ADMIN' ? 'Admin access' : principal.role === 'VIEWER' ? 'Viewer access' : 'Private workspace'}</span>
     </div>
 
     <form className="toolbar" action="/catalog">

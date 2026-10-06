@@ -48,7 +48,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
             <h2>Version {release.version}</h2>
             {index === 0 && <span className="badge">Latest release</span>}
           </div>
-          {principal.role !== 'VIEWER' && <DownloadButton id={release.id} version={release.version} />}
+          <DownloadButton id={release.id} version={release.version} />
         </div>
         <div className="eyebrow">What's new</div>
         <p className="notes">{release.notes || 'No feature notes were added to this release.'}</p>
@@ -60,7 +60,6 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
         <p className="checksum">SHA-256: {release.checksum}</p>
       </article>
     )) : <div className="empty"><Download size={35} /><h2>No published versions yet</h2><p>Check back when your administrator publishes the first release.</p></div>}
-    {principal.role === 'VIEWER' && <p className="hint" style={{ marginTop: 24 }}>Your viewer role includes release details and notes. Downloads are available to assigned customers and administrators.</p>}
-    <p className="footer-note"><ShieldCheck size={12} />All downloads require an authorized company account</p>
+    <p className="footer-note"><ShieldCheck size={12} />All downloads require an authorized account</p>
   </>;
 }

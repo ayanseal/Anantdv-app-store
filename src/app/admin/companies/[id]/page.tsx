@@ -4,14 +4,15 @@ import { ArrowLeft, Building2 } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { db } from '@/server/db';
 import { requirePagePrincipal } from '@/server/page-auth';
-import { requireAdmin } from '@/server/auth/principal';
+import { requireAdminOrViewer } from '@/server/auth/principal';
 import { listAdminApps } from '@/server/services/apps';
 import { CompanyAssignments, CompanyLogoForm } from '@/components/admin-forms';
 import { formatDate } from '@/lib/format';
 
 export default async function CompanyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const actor = await requirePagePrincipal(`/admin/companies/${id}`); requireAdmin(actor);
+  const actor = await requirePagePrincipal(`/admin/companies/${id}`); requireAdminOrViewer(actor);
+  const isAdmin = actor.role === 'ADMIN';
   const [company, apps] = await Promise.all([
     db.company.findUnique({ where: { id }, include: { assignments: { include: { app: { include: { releases: { orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }], select: { id: true, version: true, notes: true, published: true, publishedAt: true } } } } } }, users: { select: { id: true, name: true, email: true, active: true } } } }),
     listAdminApps(actor),
@@ -39,7 +40,21 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
       <div>
         <section className="panel">
           <h2>Assigned applications</h2>
-          <CompanyAssignments companyId={id} apps={apps} selected={company.assignments.map(a => a.appId)} />
+          {isAdmin ? (
+            <CompanyAssignments companyId={id} apps={apps} selected={company.assignments.map(a => a.appId)} />
+          ) : (
+            <div>
+              {company.assignments.length ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {company.assignments.map(a => (
+                    <span className="badge" key={a.appId}>{a.app.name} ({a.app.platform})</span>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">No assigned applications.</p>
+              )}
+            </div>
+          )}
         </section>
 
         <div className="section-title"><h2>Apps & versions</h2></div>
@@ -63,11 +78,13 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
       </div>
 
       <div>
-        <section className="panel">
-          <h2>Company logo</h2>
-          <CompanyLogoForm companyId={id} currentLogoUrl={company.logoUrl} />
-          <p className="hint" style={{ marginTop: 8 }}>The logo is shown on the company's profile page.</p>
-        </section>
+        {isAdmin && (
+          <section className="panel">
+            <h2>Company logo</h2>
+            <CompanyLogoForm companyId={id} currentLogoUrl={company.logoUrl} />
+            <p className="hint" style={{ marginTop: 8 }}>The logo is shown on the company's profile page.</p>
+          </section>
+        )}
 
         <section className="panel">
           <h2>Company users</h2>

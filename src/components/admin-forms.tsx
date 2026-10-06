@@ -82,15 +82,61 @@ export function CompanyLogoForm({ companyId, currentLogoUrl }: { companyId: stri
 
 export function UserForm({ user, companies }: { user?: User; companies: Company[] }) {
   const [role, setRole] = useState(user?.role || 'CUSTOMER');
-  return <ManagedForm endpoint="/api/admin/users" label={user ? 'Save user' : 'Create user'} reset={!user} build={data => ({ id: user?.id, name: data.get('name'), email: data.get('email'), role: data.get('role'), companyId: data.get('companyId') || null, active: data.get('active') === 'on' })}>
+  return <ManagedForm
+    endpoint="/api/admin/users"
+    label={user ? 'Save user' : 'Create user'}
+    reset={!user}
+    build={data => {
+      const selectedCompany = role === 'CUSTOMER' ? String(data.get('companyId') || '').trim() : null;
+      if (role === 'CUSTOMER' && !selectedCompany) {
+        throw new Error('Please select a company for this customer account.');
+      }
+      return {
+        id: user?.id,
+        name: data.get('name'),
+        email: data.get('email'),
+        role,
+        companyId: selectedCompany || null,
+        active: data.get('active') === 'on',
+      };
+    }}
+  >
     <div className="form-grid">
       <label className="field">Full name<input name="name" defaultValue={user?.name} required maxLength={100} placeholder="Full name" /></label>
       <label className="field">Email address<input name="email" type="email" defaultValue={user?.email} required maxLength={254} placeholder="name@company.com" /></label>
-      <label className="field">Role<select name="role" value={role} onChange={e => setRole(e.target.value)}><option value="CUSTOMER">Customer</option><option value="VIEWER">Viewer</option><option value="ADMIN">Administrator</option></select></label>
-      <label className="field">Company<select name="companyId" defaultValue={user?.companyId || ''} required={role === 'CUSTOMER'} disabled={role !== 'CUSTOMER'}><option value="">Select a company</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}{!c.active ? ' (inactive)' : ''}</option>)}</select></label>
+      <label className="field">
+        Role
+        <select name="role" value={role} onChange={e => setRole(e.target.value)}>
+          <option value="CUSTOMER">Customer (Company app library)</option>
+          <option value="VIEWER">Viewer (Admin panel view & downloads)</option>
+          <option value="ADMIN">Administrator (Full admin panel access)</option>
+        </select>
+      </label>
+
+      {/* For Customer: Company field pops up and is strictly mandatory */}
+      {role === 'CUSTOMER' ? (
+        <label className="field" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+          <span>Company <strong style={{ color: '#d32f2f' }}>* (Required)</strong></span>
+          <select name="companyId" defaultValue={user?.companyId || ''} required>
+            <option value="">-- Choose a company --</option>
+            {companies.map(c => <option key={c.id} value={c.id}>{c.name}{!c.active ? ' (inactive)' : ''}</option>)}
+          </select>
+        </label>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px', borderRadius: 8, background: '#f0f6f2', border: '1px solid #c9dec1', color: '#164c37', fontSize: 12 }}>
+          <ShieldCheck size={16} style={{ flexShrink: 0, color: '#1b6449' }} />
+          <span>Internal {role === 'ADMIN' ? 'Administrator' : 'Viewer'} accounts belong to our admin panel and do not belong to a customer company.</span>
+        </div>
+      )}
     </div>
     <label className="check"><input type="checkbox" name="active" defaultChecked={user?.active ?? true} />Account is active</label>
-    <p className="hint">Customers download company-assigned apps. Viewers browse all apps without downloading.</p>
+    <p className="hint">
+      {role === 'CUSTOMER'
+        ? 'Customers access the catalog and download apps assigned to their company.'
+        : role === 'VIEWER'
+        ? 'Viewers have read-only access to our admin panel and can download all released and unreleased binaries across all companies.'
+        : 'Administrators have full management, upload, user creation, and publishing rights.'}
+    </p>
   </ManagedForm>;
 }
 

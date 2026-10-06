@@ -15,9 +15,10 @@ export async function loadPrincipal(userId: string): Promise<Principal> {
   return { id: user.id, role: user.role, companyId: user.companyId, name: user.name, email: user.email, companyName: user.company?.name ?? null, authVersion: user.authVersion };
 }
 export function requireAdmin(principal: Principal) { if (principal.role !== 'ADMIN') throw forbidden(); }
-export async function requireAppAccess(principal: Principal, appId: string, intent: 'browse' | 'download') {
+export function requireAdminOrViewer(principal: Principal) { if (principal.role !== 'ADMIN' && principal.role !== 'VIEWER') throw forbidden(); }
+export async function requireAppAccess(principal: Principal, appId: string, _intent: 'browse' | 'download' = 'browse') {
   const current = await loadPrincipal(principal.id);
-  if (intent === 'download' && current.role === 'VIEWER') throw forbidden();
+  if (current.role === 'ADMIN' || current.role === 'VIEWER') return;
   const app = await db.app.findUnique({ where: { id: appId }, include: { assignments: { where: { companyId: current.companyId ?? '' } } } });
-  if (!app || (current.role !== 'ADMIN' && !app.active) || (current.role === 'CUSTOMER' && !app.assignments.length)) throw forbidden();
+  if (!app || !app.active || (current.role === 'CUSTOMER' && !app.assignments.length)) throw forbidden();
 }

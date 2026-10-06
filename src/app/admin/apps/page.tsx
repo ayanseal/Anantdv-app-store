@@ -16,29 +16,32 @@ export default async function AppsPage() {
     listCompanies(actor),
   ]);
   const config = getConfig();
+  const isAdmin = actor.role === 'ADMIN';
 
   return (
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">Release management</div>
+          <div className="eyebrow">{isAdmin ? 'Release management' : 'Release management (View-only)'}</div>
           <h1>Apps & releases</h1>
-          <p>Upload new apps with photos & APK binaries stored locally on the server, allocate companies, and manage publications.</p>
+          <p>{isAdmin ? 'Upload new apps with photos & APK binaries, allocate companies, and manage publications.' : 'Browse all applications, allocated companies, and release history.'}</p>
         </div>
         <span className="badge neutral">{apps.length} apps</span>
       </div>
 
-      <section className="panel" style={{ padding: '24px 28px' }}>
-        <div style={{ marginBottom: 20 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 4 }}>Upload & Publish New Application</h2>
-          <p className="hint">Upload your app photo/icon, APK installation binary, configure public store or company allocations — all saved locally on the server.</p>
-        </div>
-        <CreateAppFullForm
-          companies={companies}
-          maxMb={config.uploadMaxBytes / 1048576}
-          extensions={config.extensions}
-        />
-      </section>
+      {isAdmin && (
+        <section className="panel" style={{ padding: '24px 28px' }}>
+          <div style={{ marginBottom: 20 }}>
+            <h2 style={{ fontSize: 18, marginBottom: 4 }}>Upload & Publish New Application</h2>
+            <p className="hint">Upload your app photo/icon, APK installation binary, configure public store or company allocations — all saved locally on the server.</p>
+          </div>
+          <CreateAppFullForm
+            companies={companies}
+            maxMb={config.uploadMaxBytes / 1048576}
+            extensions={config.extensions}
+          />
+        </section>
+      )}
 
       <section className="panel">
         <h2>All applications ({apps.length})</h2>
@@ -72,9 +75,9 @@ export default async function AppsPage() {
               <div className="row-actions">
                 <span className={`badge ${app.active ? '' : 'neutral'}`}>{app.active ? 'Active' : 'Disabled'}</span>
                 <Link href={`/admin/apps/${app.id}`} className="button secondary small">
-                  Manage releases <ArrowUpRight size={13} />
+                  {isAdmin ? 'Manage releases' : 'View releases'} <ArrowUpRight size={13} />
                 </Link>
-                <DeleteAppButton appId={app.id} appName={app.name} redirectToList={false} />
+                {isAdmin && <DeleteAppButton appId={app.id} appName={app.name} redirectToList={false} />}
               </div>
             </div>
           ))
