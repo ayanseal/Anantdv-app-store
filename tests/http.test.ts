@@ -12,6 +12,7 @@ it('rejects missing and foreign mutation origins', () => {
 });
 it.each(['http://localhost:3000', 'http://192.168.1.15:3000', 'https://store.example', 'http://[::1]:3000'])('supports the current origin %s in production', origin => {
   vi.stubEnv('NODE_ENV', 'production');
+  vi.stubEnv('TRUST_PROXY', origin.startsWith('https:') ? 'true' : 'false');
   const request = new Request(`${origin}/api/auth/login`, { headers: { origin } });
   expect(() => assertMutationOrigin(request)).not.toThrow();
   expect(sessionCookieOptions(request)).toMatchObject({ secure: origin.startsWith('https:'), httpOnly: true, sameSite: 'strict', path: '/' });
@@ -35,6 +36,12 @@ it('honors forwarded host and protocol only behind a trusted proxy', () => {
   vi.stubEnv('TRUST_PROXY', 'true');
   expect(() => assertMutationOrigin(request)).not.toThrow();
   expect(sessionCookieOptions(request).secure).toBe(true);
+});
+it('ignores a protocol already rewritten by Next from an untrusted forwarded header', () => {
+  vi.stubEnv('TRUST_PROXY', 'false');
+  const request = new Request('https://localhost:3000/api', { headers: { host: 'localhost:3000', origin: 'http://localhost:3000', 'x-forwarded-proto': 'https' } });
+  expect(() => assertMutationOrigin(request)).not.toThrow();
+  expect(sessionCookieOptions(request).secure).toBe(false);
 });
 it.each(['https,http', 'ftp'])('rejects invalid forwarded protocols %s', protocol => {
   vi.stubEnv('TRUST_PROXY', 'true');

@@ -8,7 +8,9 @@ import { principalFromAccess, type SessionTokens } from './auth/sessions';
 function requestOrigin(request: Request) {
   const url = new URL(request.url);
   const trustProxy = getConfig().trustProxy;
-  const protocol = (trustProxy ? request.headers.get('x-forwarded-proto') : null) ?? url.protocol.slice(0, -1);
+  // next start serves HTTP. Next may rewrite request.url using untrusted
+  // forwarded headers, so only proxy mode may use its public protocol.
+  const protocol = trustProxy ? (request.headers.get('x-forwarded-proto') ?? url.protocol.slice(0, -1)) : 'http';
   const host = (trustProxy ? request.headers.get('x-forwarded-host') : null) ?? request.headers.get('host') ?? url.host;
   if (!['http', 'https'].includes(protocol) || !host || /[\s,/@?#\\]/.test(host)) {
     throw new AppError('CSRF', 403, 'Invalid request origin.');
