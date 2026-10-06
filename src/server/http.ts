@@ -4,53 +4,47 @@ import { ZodError } from 'zod';
 import { getConfig } from '@/config/env';
 import { AppError, unauthorized } from './errors';
 import { principalFromAccess, type SessionTokens } from './auth/sessions';
-export function assertMutationOrigin(request: Request) {
-  const origin = request.headers.get('origin');
-  if (!origin || request.headers.get('sec-fetch-site') === 'cross-site') {
+// Derive the public origin per request so the same build works on any host.
+function requestOrigin(request: Request) {
+  const url = new URL(request.url);
+  const trustProxy = getConfig().trustProxy;
+  const protocol = (trustProxy ? request.headers.get('x-forwarded-proto') : null) ?? url.protocol.slice(0, -1);
+  const host = (trustProxy ? request.headers.get('x-forwarded-host') : null) ?? request.headers.get('host') ?? url.host;
+  if (!['http', 'https'].includes(protocol) || !host || /[\s,/@?#\\]/.test(host)) {
     throw new AppError('CSRF', 403, 'Invalid request origin.');
   }
-  const configured = getConfig().origin;
-  if (origin === configured) return;
-
-  // Allow same-host origin when accessing via IP, localhost, or network hostname
   try {
-    const originUrl = new URL(origin);
-    const hostHeader = request.headers.get('x-forwarded-host') || request.headers.get('host');
-    const reqUrl = new URL(request.url);
-    const expectedHost = hostHeader || reqUrl.host;
-    if (originUrl.host === expectedHost) return;
-    if (originUrl.hostname === expectedHost.replace(/:\d+$/, '')) return;
-
-    // Allow LAN / loopback IPs in local development
-    if (
-      originUrl.hostname === 'localhost' ||
-      originUrl.hostname === '127.0.0.1' ||
-      /^192\.168\.\d{1,3}\.\d{1,3}$/.test(originUrl.hostname) ||
-      /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(originUrl.hostname) ||
-      /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(originUrl.hostname)
-    ) {
-      return;
-    }
-  } catch {}
-
-  throw new AppError('CSRF', 403, 'Invalid request origin.');
+    const origin = new URL(protocol + '://' + host);
+    if (origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) throw new Error('Invalid host');
+    return origin;
+  } catch {
+    throw new AppError('CSRF', 403, 'Invalid request origin.');
+  }
 }
-export function sessionCookieOptions(production = getConfig().production) {
+export function assertMutationOrigin(request: Request) {
+  const origin = request.headers.get('origin');
+  if (!origin || request.headers.get('sec-fetch-site') === 'cross-site' || origin !== requestOrigin(request).origin) {
+    throw new AppError('CSRF', 403, 'Invalid request origin.');
+  }
+}
+export function sessionCookieOptions(request: Request) {
   return {
     httpOnly: true,
-    secure: production,
-    sameSite: (production ? 'strict' : 'lax') as 'strict' | 'lax',
+    secure: requestOrigin(request).protocol === 'https:',
+    sameSite: 'strict' as const,
     path: '/'
   };
 }
-export function attachSession(response: NextResponse, tokens: SessionTokens) {
-  response.cookies.set('payana_access', tokens.accessToken, { ...sessionCookieOptions(), maxAge: tokens.accessSeconds });
-  response.cookies.set('payana_refresh', tokens.refreshToken, { ...sessionCookieOptions(), maxAge: tokens.refreshSeconds });
-  response.cookies.set('payana_challenge', '', { ...sessionCookieOptions(), maxAge: 0 });
+export function attachSession(response: NextResponse, tokens: SessionTokens, request: Request) {
+  const options = sessionCookieOptions(request);
+  response.cookies.set('payana_access', tokens.accessToken, { ...options, maxAge: tokens.accessSeconds });
+  response.cookies.set('payana_refresh', tokens.refreshToken, { ...options, maxAge: tokens.refreshSeconds });
+  response.cookies.set('payana_challenge', '', { ...options, maxAge: 0 });
   return response;
 }
-export function clearCookies(response: NextResponse) {
-  for (const name of ['payana_access', 'payana_refresh', 'payana_challenge']) response.cookies.set(name, '', { ...sessionCookieOptions(), maxAge: 0 });
+export function clearCookies(response: NextResponse, request: Request) {
+  const options = sessionCookieOptions(request);
+  for (const name of ['payana_access', 'payana_refresh', 'payana_challenge']) response.cookies.set(name, '', { ...options, maxAge: 0 });
   return response;
 }
 export async function getRequestPrincipal() {

@@ -1,5 +1,4 @@
 import { defineConfig } from '@playwright/test';
-process.env.APP_ORIGIN = 'http://localhost:3001';
 process.env.DATABASE_URL = 'file:./data/e2e.db';
 process.env.UPLOAD_DIR = './data/e2e-uploads';
 process.env.TOKEN_SECRET = 'e2e-only-not-production-token-secret-123456789';

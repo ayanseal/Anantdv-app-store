@@ -12,12 +12,12 @@ import { recordAudit } from '@/server/audit';
 import { isMfaDisabled } from '@/server/auth/principal';
 import { unauthorized, AppError } from '@/server/errors';
 type Context = { params: Promise<{ action: string }> };
-function loginResponse(result: LoginResult) {
-  if (result.kind === 'session') return attachSession(json({ kind: 'session', role: result.role }), result.tokens);
+function loginResponse(result: LoginResult, request: Request) {
+  if (result.kind === 'session') return attachSession(json({ kind: 'session', role: result.role }), result.tokens, request);
   const response = json({ kind: result.kind, role: result.role });
-  response.cookies.set('payana_challenge', result.challengeToken, { ...sessionCookieOptions(), maxAge: 600 });
-  response.cookies.set('payana_access', '', { ...sessionCookieOptions(), maxAge: 0 });
-  response.cookies.set('payana_refresh', '', { ...sessionCookieOptions(), maxAge: 0 });
+  response.cookies.set('payana_challenge', result.challengeToken, { ...sessionCookieOptions(request), maxAge: 600 });
+  response.cookies.set('payana_access', '', { ...sessionCookieOptions(request), maxAge: 0 });
+  response.cookies.set('payana_refresh', '', { ...sessionCookieOptions(request), maxAge: 0 });
   return response;
 }
 export async function GET(_request: Request, context: Context) {
@@ -41,13 +41,13 @@ export async function POST(request: Request, context: Context) {
     const { action } = await context.params;
     const jar = await cookies();
     if (action === 'refresh') {
-      try { const token = jar.get('payana_refresh')?.value; if (!token) throw unauthorized(); return attachSession(json({ ok: true }), await rotateSession(token)); }
-      catch { return clearCookies(json({ error: { code: 'UNAUTHORIZED', message: 'Your session has ended. Please sign in again.' } }, 401)); }
+      try { const token = jar.get('payana_refresh')?.value; if (!token) throw unauthorized(); return attachSession(json({ ok: true }), await rotateSession(token), request); }
+      catch { return clearCookies(json({ error: { code: 'UNAUTHORIZED', message: 'Your session has ended. Please sign in again.' } }, 401), request); }
     }
-    if (action === 'logout') { const token = jar.get('payana_refresh')?.value; if (token) await logoutToken(token); return clearCookies(json({ ok: true })); }
+    if (action === 'logout') { const token = jar.get('payana_refresh')?.value; if (token) await logoutToken(token); return clearCookies(json({ ok: true }), request); }
     if (action === 'login') {
       const input = z.object({ email: z.string().max(254), password: z.string().max(128) }).parse(await jsonBody(request));
-      return loginResponse(await login(input.email, input.password, requestIp(request)));
+      return loginResponse(await login(input.email, input.password, requestIp(request)), request);
     }
     if (action === 'reset-password') {
       const input = z.object({
@@ -55,13 +55,13 @@ export async function POST(request: Request, context: Context) {
         previousPassword: z.string().max(128),
         newPassword: z.string().min(12).max(128),
       }).parse(await jsonBody(request));
-      return loginResponse(await resetPasswordWithPrevious(input.email, input.previousPassword, input.newPassword, requestIp(request)));
+      return loginResponse(await resetPasswordWithPrevious(input.email, input.previousPassword, input.newPassword, requestIp(request)), request);
     }
     const challenge = jar.get('payana_challenge')?.value;
     if (!challenge) throw unauthorized();
     if (action === 'password') {
       const input = z.object({ password: z.string().min(12).max(128) }).parse(await jsonBody(request));
-      return loginResponse(await changePassword(challenge, input.password));
+      return loginResponse(await changePassword(challenge, input.password), request);
     }
     if (action === 'enrollment') {
       const user = await resolveChallenge(challenge, 'enroll');
@@ -78,7 +78,7 @@ export async function POST(request: Request, context: Context) {
       if (action === 'enroll') recoveryCodes = (await finishEnrollment(user.id, input.code, challenge)).recoveryCodes;
       else await verifyAdminFactor(user.id, input.recovery ? { recoveryCode: input.code } : { totp: input.code }, challenge);
       await recordAudit({ actorId: user.id, action: 'ADMIN_LOGIN' });
-      return attachSession(json({ kind: 'session', role: 'ADMIN', recoveryCodes }), await issueSession(user.id, user.authVersion + (action === 'enroll' ? 1 : 0)));
+      return attachSession(json({ kind: 'session', role: 'ADMIN', recoveryCodes }), await issueSession(user.id, user.authVersion + (action === 'enroll' ? 1 : 0)), request);
     }
     throw new AppError('NOT_FOUND', 404, 'Not found.');
   });
