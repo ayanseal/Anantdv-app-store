@@ -65,33 +65,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </nav>
       </header>
 
-      {/* Logged-in Staff & Customer Command Strip */}
-      {principal && (
-        <aside className="home-dashboard-banner">
-          <div className="home-dashboard-banner-inner">
-            <div className="home-dashboard-user">
-              <div className="avatar small">{principal.email.slice(0, 2).toUpperCase()}</div>
-              <div>
-                <span>Signed in as <strong>{principal.name || principal.email}</strong></span>
-                <span className="role-tag">{principal.role}</span>
-              </div>
-            </div>
-            <div className="home-dashboard-actions">
-              {(principal.role === 'ADMIN' || principal.role === 'VIEWER') && (
-                <Link href="/admin" className="button small">
-                  <LayoutDashboard size={14} />
-                  <span>Admin Panel</span>
-                </Link>
-              )}
-              <Link href="/catalog" className="button secondary small">
-                <Layers size={14} />
-                <span>{principal.role === 'CUSTOMER' ? 'Customer Dashboard' : 'App Library'}</span>
-              </Link>
-            </div>
-          </div>
-        </aside>
-      )}
-
       {/* Hero */}
       <section className="public-hero">
         <div className="public-hero-inner">
