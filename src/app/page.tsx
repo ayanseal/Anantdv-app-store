@@ -26,7 +26,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   let principal = null;
   try {
     principal = await getRequestPrincipal();
-  } catch {}
+  } catch { }
 
   const currentPlatform = filters.platform || '';
 
@@ -55,8 +55,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 className="public-user-chip"
                 title={`Signed in as ${principal.email} (${principal.role})`}
               >
-                <div className="avatar small">{principal.email.slice(0, 2).toUpperCase()}</div>
-                <span className="user-chip-label">{principal.role}</span>
+                {/* <div className="avatar small">{principal.email.slice(0, 2).toUpperCase()}</div> */}
+                {/* <span className="user-chip-label">{principal.role}</span> */}
               </div>
             </div>
           ) : (
