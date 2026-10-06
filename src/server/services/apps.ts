@@ -78,13 +78,13 @@ async function saveImageFile(entityId: string, subdir: string, file: { path: str
   const { promises: fs } = await import('node:fs');
   const path = await import('node:path');
   const config = getConfig();
-  const dir = path.join(config.uploadDir, subdir);
+  const dir = path.resolve(process.cwd(), config.uploadDir, subdir);
   await fs.mkdir(dir, { recursive: true });
   // Remove old file for this entity
-  const existing = await fs.readdir(dir).catch(() => [] as string[]);
-  for (const f of existing.filter(f => f.startsWith(`${entityId}.`))) await fs.rm(path.join(dir, f), { force: true });
+  const existing = await fs.readdir(/*turbopackIgnore: true*/ dir).catch(() => [] as string[]);
+  for (const f of existing.filter(f => f.startsWith(`${entityId}.`))) await fs.rm(path.resolve(dir, f), { force: true });
   const ext = file.filename.split('.').pop()?.toLowerCase() || 'png';
-  const dest = path.join(dir, `${entityId}.${ext}`);
+  const dest = path.resolve(dir, `${entityId}.${ext}`);
   await fs.copyFile(file.path, dest);
   await fs.unlink(file.path).catch(() => {});
 }

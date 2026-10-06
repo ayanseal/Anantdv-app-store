@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Upload, Check, ImagePlus, Globe, Lock, FileUp, X, Package, CheckCircle2, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Upload, Check, ImagePlus, Globe, Lock, FileUp, X, Package, CheckCircle2, Trash2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import Image from 'next/image';
 import { api } from '@/lib/api-client';
 import { formatSize } from '@/lib/format';

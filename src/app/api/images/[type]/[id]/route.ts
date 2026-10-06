@@ -27,17 +27,17 @@ export async function GET(_req: Request, context: Context) {
       throw new AppError('NOT_FOUND', 404, 'Not found.');
     }
 
-    const dir = nodePath.join(config.uploadDir, subdir);
-    const files = await fs.readdir(dir).catch(() => [] as string[]);
+    const dir = nodePath.resolve(process.cwd(), config.uploadDir, subdir);
+    const files = await fs.readdir(/*turbopackIgnore: true*/ dir).catch(() => [] as string[]);
     const file = files.find(f => f.startsWith(`${id}.`));
     if (!file) throw new AppError('NOT_FOUND', 404, 'Image missing.');
-    const fullPath = nodePath.join(dir, file);
-    const stat = await fs.stat(fullPath);
+    const fullPath = nodePath.resolve(dir, file);
+    const stat = await fs.stat(/*turbopackIgnore: true*/ fullPath);
     const etag = `"${stat.mtimeMs.toString(36)}-${stat.size.toString(36)}"`;
     if (_req.headers.get('if-none-match') === etag) {
       return new Response(null, { status: 304, headers: { ETag: etag, 'Cache-Control': 'no-cache, must-revalidate' } });
     }
-    const buf = await fs.readFile(fullPath);
+    const buf = await fs.readFile(/*turbopackIgnore: true*/ fullPath);
     const ext = file.split('.').pop()?.toLowerCase();
     const mime = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/png';
     return new Response(buf, { headers: { 'Content-Type': mime, ETag: etag, 'Cache-Control': 'no-cache, must-revalidate' } });
