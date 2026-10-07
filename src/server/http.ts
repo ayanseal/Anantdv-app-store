@@ -7,13 +7,18 @@ import { principalFromAccess, type SessionTokens } from './auth/sessions';
 // Helper to determine if the request is running over HTTPS (directly or behind Nginx).
 export function isRequestHttps(request?: Request): boolean {
   if (!request) return false;
+  // If the browser explicitly originated from http://, do not mark secure
+  // because browsers reject Set-Cookie with 'Secure' over plain HTTP.
+  const origin = request.headers.get('origin');
+  if (origin?.startsWith('http://')) return false;
+  const referer = request.headers.get('referer');
+  if (referer?.startsWith('http://')) return false;
+
   const proto = request.headers.get('x-forwarded-proto');
   if (proto) return proto.toLowerCase().split(',')[0].trim() === 'https';
   if (request.headers.get('x-forwarded-ssl') === 'on') return true;
   if (request.url.startsWith('https:')) return true;
-  const origin = request.headers.get('origin');
   if (origin?.startsWith('https:')) return true;
-  const referer = request.headers.get('referer');
   if (referer?.startsWith('https:')) return true;
   return false;
 }
