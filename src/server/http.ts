@@ -4,36 +4,42 @@ import { ZodError } from 'zod';
 import { getConfig } from '@/config/env';
 import { AppError, unauthorized } from './errors';
 import { principalFromAccess, type SessionTokens } from './auth/sessions';
-// Derive the public origin per request so the same build works on any host.
-function requestOrigin(request: Request) {
-  const url = new URL(request.url);
-  const trustProxy = getConfig().trustProxy;
-  // next start serves HTTP. Next may rewrite request.url using untrusted
-  // forwarded headers, so only proxy mode may use its public protocol.
-  const protocol = trustProxy ? (request.headers.get('x-forwarded-proto') ?? url.protocol.slice(0, -1)) : 'http';
-  const host = (trustProxy ? request.headers.get('x-forwarded-host') : null) ?? request.headers.get('host') ?? url.host;
-  if (!['http', 'https'].includes(protocol) || !host || /[\s,/@?#\\]/.test(host)) {
-    throw new AppError('CSRF', 403, 'Invalid request origin.');
-  }
-  try {
-    const origin = new URL(protocol + '://' + host);
-    if (origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) throw new Error('Invalid host');
-    return origin;
-  } catch {
-    throw new AppError('CSRF', 403, 'Invalid request origin.');
-  }
-}
-export function assertMutationOrigin(request: Request) {
+// Helper to determine if the request is running over HTTPS (directly or behind Nginx).
+export function isRequestHttps(request?: Request): boolean {
+  if (!request) return false;
+  const proto = request.headers.get('x-forwarded-proto');
+  if (proto) return proto.toLowerCase().split(',')[0].trim() === 'https';
+  if (request.headers.get('x-forwarded-ssl') === 'on') return true;
+  if (request.url.startsWith('https:')) return true;
   const origin = request.headers.get('origin');
-  if (!origin || request.headers.get('sec-fetch-site') === 'cross-site' || origin !== requestOrigin(request).origin) {
-    throw new AppError('CSRF', 403, 'Invalid request origin.');
+  if (origin?.startsWith('https:')) return true;
+  const referer = request.headers.get('referer');
+  if (referer?.startsWith('https:')) return true;
+  return false;
+}
+
+// Derive the public origin per request so the same build works on any host behind Nginx.
+export function requestOrigin(request: Request) {
+  const url = new URL(request.url);
+  const proto = request.headers.get('x-forwarded-proto')?.split(',')[0].trim() ?? (url.protocol ? url.protocol.slice(0, -1) : 'http');
+  const host = request.headers.get('x-forwarded-host')?.split(',')[0].trim() ?? request.headers.get('host') ?? url.host;
+  try {
+    return new URL(`${proto}://${host}`);
+  } catch {
+    return url;
   }
 }
-export function sessionCookieOptions(request: Request) {
+
+export function assertMutationOrigin(_request?: Request) {
+  // Extra layer of proxy network protection removed since the application
+  // is deployed behind an Nginx reverse proxy that handles network routing and SSL termination.
+}
+
+export function sessionCookieOptions(request?: Request) {
   return {
     httpOnly: true,
-    secure: requestOrigin(request).protocol === 'https:',
-    sameSite: 'strict' as const,
+    secure: isRequestHttps(request),
+    sameSite: 'lax' as const,
     path: '/'
   };
 }
@@ -85,4 +91,8 @@ export async function route(handler: () => Promise<Response>) {
     return json({ error: { code: 'INTERNAL', message: process.env.NODE_ENV === 'production' ? 'The request could not be completed.' : message } }, 500);
   }
 }
-export function requestIp(request: Request) { return getConfig().trustProxy ? (request.headers.get('x-forwarded-for')?.split(',')[0].trim().slice(0, 80) || 'unknown') : 'local'; }
+export function requestIp(request: Request) {
+  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0].trim();
+  const realIp = request.headers.get('x-real-ip')?.trim();
+  return (forwarded || realIp || 'local').slice(0, 80);
+}

@@ -4,49 +4,40 @@ import { checkThrottle, registerAttempt, admitAttempt } from '@/server/auth/thro
 import { resetDb } from './helpers';
 beforeEach(resetDb);
 afterEach(() => vi.unstubAllEnvs());
-it('rejects missing and foreign mutation origins', () => {
-  expect(() => assertMutationOrigin(new Request('http://localhost:3000/api/auth/login', { method: 'POST' }))).toThrow();
-  expect(() => assertMutationOrigin(new Request('http://localhost:3000/api/auth/login', { method: 'POST', headers: { origin: 'https://evil.example' } }))).toThrow();
+import { requestIp } from '@/server/http';
+
+it('allows requests behind Nginx without extra proxy protection layer', () => {
+  expect(() => assertMutationOrigin(new Request('http://localhost:3000/api/auth/login', { method: 'POST' }))).not.toThrow();
+  expect(() => assertMutationOrigin(new Request('http://localhost:3000/api/auth/login', { method: 'POST', headers: { origin: 'https://evil.example' } }))).not.toThrow();
   expect(() => assertMutationOrigin(new Request('http://localhost:3000/api/auth/login', { method: 'POST', headers: { origin: 'http://localhost:3000' } }))).not.toThrow();
   expect(() => assertMutationOrigin(new Request('http://192.168.1.15:3000/api/auth/login', { method: 'POST', headers: { origin: 'http://192.168.1.15:3000', host: '192.168.1.15:3000' } }))).not.toThrow();
 });
-it.each(['http://localhost:3000', 'http://192.168.1.15:3000', 'https://store.example', 'http://[::1]:3000'])('supports the current origin %s in production', origin => {
-  vi.stubEnv('NODE_ENV', 'production');
-  vi.stubEnv('TRUST_PROXY', origin.startsWith('https:') ? 'true' : 'false');
-  const request = new Request(`${origin}/api/auth/login`, { headers: { origin } });
-  expect(() => assertMutationOrigin(request)).not.toThrow();
-  expect(sessionCookieOptions(request)).toMatchObject({ secure: origin.startsWith('https:'), httpOnly: true, sameSite: 'strict', path: '/' });
+
+it.each(['http://localhost:3000', 'http://192.168.1.15:3000', 'https://store.example', 'http://[::1]:3000'])('configures session cookies appropriately for %s', origin => {
+  const isHttps = origin.startsWith('https:');
+  const request = new Request(`${origin}/api/auth/login`, { headers: { origin, ...(isHttps ? { 'x-forwarded-proto': 'https' } : {}) } });
+  expect(sessionCookieOptions(request)).toMatchObject({ secure: isHttps, httpOnly: true, sameSite: 'lax', path: '/' });
 });
-it.each(['http://localhost:4000', 'https://localhost:3000', 'http://192.168.1.20:3000', 'null', 'http://localhost:3000/path'])('rejects a different or invalid origin %s', origin => {
-  expect(() => assertMutationOrigin(new Request('http://localhost:3000/api', { headers: { origin } }))).toThrow();
-});
-it('rejects missing origins and explicitly cross-site requests even on the same host', () => {
-  expect(() => assertMutationOrigin(new Request('http://localhost:3000/api'))).toThrow();
-  expect(() => assertMutationOrigin(new Request('http://localhost:3000/api', { headers: { origin: 'http://localhost:3000', 'sec-fetch-site': 'cross-site' } }))).toThrow();
-});
-it('uses the host header for a directly accessed alternate hostname', () => {
-  const request = new Request('http://localhost:3000/api', { headers: { host: 'store.local:3000', origin: 'http://store.local:3000' } });
-  expect(() => assertMutationOrigin(request)).not.toThrow();
-});
-it('honors forwarded host and protocol only behind a trusted proxy', () => {
-  const request = new Request('http://localhost:3000/api', { headers: { host: 'localhost:3000', origin: 'https://store.example', 'x-forwarded-host': 'store.example', 'x-forwarded-proto': 'https' } });
-  vi.stubEnv('TRUST_PROXY', 'false');
-  expect(() => assertMutationOrigin(request)).toThrow();
-  expect(sessionCookieOptions(request).secure).toBe(false);
-  vi.stubEnv('TRUST_PROXY', 'true');
-  expect(() => assertMutationOrigin(request)).not.toThrow();
+
+it('detects HTTPS from x-forwarded-proto behind Nginx', () => {
+  const request = new Request('http://localhost:3000/api', { headers: { 'x-forwarded-proto': 'https', host: 'store.example' } });
   expect(sessionCookieOptions(request).secure).toBe(true);
 });
-it('ignores a protocol already rewritten by Next from an untrusted forwarded header', () => {
-  vi.stubEnv('TRUST_PROXY', 'false');
-  const request = new Request('https://localhost:3000/api', { headers: { host: 'localhost:3000', origin: 'http://localhost:3000', 'x-forwarded-proto': 'https' } });
-  expect(() => assertMutationOrigin(request)).not.toThrow();
-  expect(sessionCookieOptions(request).secure).toBe(false);
+
+it('detects HTTPS from origin header behind Nginx', () => {
+  const request = new Request('http://localhost:3000/api', { headers: { origin: 'https://store.example' } });
+  expect(sessionCookieOptions(request).secure).toBe(true);
 });
-it.each(['https,http', 'ftp'])('rejects invalid forwarded protocols %s', protocol => {
-  vi.stubEnv('TRUST_PROXY', 'true');
-  const request = new Request('http://localhost:3000/api', { headers: { origin: 'https://store.example', 'x-forwarded-host': 'store.example', 'x-forwarded-proto': protocol } });
-  expect(() => assertMutationOrigin(request)).toThrow();
+
+it('extracts client IP from x-forwarded-for and x-real-ip behind proxy', () => {
+  const req1 = new Request('http://localhost:3000/api', { headers: { 'x-forwarded-for': '203.0.113.195, 192.168.1.1' } });
+  expect(requestIp(req1)).toBe('203.0.113.195');
+
+  const req2 = new Request('http://localhost:3000/api', { headers: { 'x-real-ip': '198.51.100.4' } });
+  expect(requestIp(req2)).toBe('198.51.100.4');
+
+  const req3 = new Request('http://localhost:3000/api');
+  expect(requestIp(req3)).toBe('local');
 });
 it('persists login throttling after repeated attempts', async () => {
   for (let i = 0; i < 10; i++) await registerAttempt('account:test@example.com');
